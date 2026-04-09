@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MIDI → Arduino</title>
+</head>
+<body>
+
+<h2>Upload do MIDI</h2>
+<input type="file" id="fileInput" />
+
+<h3>Código Arduino:</h3>
+<pre id="output">Esperando arquivo...</pre>
+
+<script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.27/build/Midi.min.js"></script>
+
+<script>
+document.getElementById("fileInput").addEventListener("change", async function(e) {
+  try {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const arrayBuffer = await file.arrayBuffer();
+
+    const midi = new Midi(arrayBuffer);
+
+    let notes = [];
+
+    midi.tracks[0].notes.forEach(note => {
+      notes.push({
+        freq: 440 * Math.pow(2, (note.midi - 69) / 12),
+        start: note.time,
+        duration: note.duration
+      });
+    });
+
+    notes.sort((a, b) => a.start - b.start);
+
+    let code = "";
+    code += "int buzzer = 8;\n\n";
+    code += "void setup() {\n  pinMode(buzzer, OUTPUT);\n}\n\n";
+    code += "void loop() {\n";
+
+    let lastTime = 0;
+
+    notes.forEach(n => {
+      let wait = Math.round((n.start - lastTime) * 1000);
+      let dur = Math.round(n.duration * 1000);
+
+      if (wait > 0) {
+        code += `  delay(${wait});\n`;
+      }
+
+      code += `  tone(buzzer, ${Math.round(n.freq)});\n`;
+      code += `  delay(${dur});\n`;
+      code += `  noTone(buzzer);\n`;
+
+      lastTime = n.start + n.duration;
+    });
+
+    code += "\n  delay(3000);\n}";
+    
+    document.getElementById("output").textContent = code;
+
+  } catch (err) {
+    document.getElementById("output").textContent = "ERRO: " + err;
+    console.error(err);
+  }
+});
+</script>
+
+</body>
+</html>
